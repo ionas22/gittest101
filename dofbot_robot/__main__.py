@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
+from glob import glob
 
 import cv2
 
@@ -17,14 +17,30 @@ def parse_order(value: str) -> list[Color]:
 
 
 def capture(config: RobotConfig):
-    camera = cv2.VideoCapture(config.camera_index)
-    if not camera.isOpened():
-        raise RuntimeError(f"cannot open camera index {config.camera_index}")
-    ok, frame = camera.read()
-    camera.release()
-    if not ok:
-        raise RuntimeError("camera did not provide a frame")
-    return frame
+    configured = config.camera_device
+    if configured != "auto":
+        sources = [configured]
+    else:
+        sources = sorted(glob("/dev/video*"))
+        if not sources:
+            sources = list(range(0, 6))
+
+    attempted = []
+    for source in sources:
+        camera = cv2.VideoCapture(source, cv2.CAP_V4L2)
+        attempted.append(str(source))
+        if camera.isOpened():
+            ok, frame = camera.read()
+            camera.release()
+            if ok:
+                print(f"Camera: {source}")
+                return frame
+        else:
+            camera.release()
+    raise RuntimeError(
+        "no capturable camera found. Tried: {}. Check /dev/video* and camera permissions."
+        .format(", ".join(attempted))
+    )
 
 
 def main() -> None:

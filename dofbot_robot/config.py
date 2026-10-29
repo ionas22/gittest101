@@ -23,6 +23,10 @@ class RobotConfig:
         return int(self.values.get("camera_index", 0))
 
     @property
+    def camera_device(self) -> str:
+        return str(self.values.get("camera_device", "auto"))
+
+    @property
     def colors(self) -> dict[str, tuple[tuple[int, int, int], tuple[int, int, int]]]:
         return {
             name: (tuple(bounds[0]), tuple(bounds[1]))
