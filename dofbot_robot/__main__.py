@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 from glob import glob
+import re
 
 import cv2
 
@@ -27,7 +28,11 @@ def capture(config: RobotConfig):
 
     attempted = []
     for source in sources:
-        camera = cv2.VideoCapture(source, cv2.CAP_V4L2)
+        # Some OpenCV builds on Raspberry Pi reject "/dev/videoN" as a
+        # filename but accept the corresponding numeric V4L2 index.
+        match = re.fullmatch(r"/dev/video(\d+)", str(source))
+        capture_source = int(match.group(1)) if match else source
+        camera = cv2.VideoCapture(capture_source, cv2.CAP_V4L2)
         attempted.append(str(source))
         if camera.isOpened():
             ok, frame = camera.read()
