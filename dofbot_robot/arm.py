@@ -26,12 +26,6 @@ class DryRunArm(Arm):
 
 
 class YahboomArm(Arm):
-    """Adapter boundary for the official Yahboom SDK.
-
-    Replace only these three methods with the calls exposed by the installed
-    image; planning and safety sequencing remain unchanged.
-    """
-
     def __init__(self, config: RobotConfig) -> None:
         self.config = config
         try:
@@ -44,16 +38,25 @@ class YahboomArm(Arm):
         self.device = Arm_Device()
         self.kinematics = ArmMoveIK()
 
+    def move_to_look_pose(self) -> None:
+        # Pozitie fixa deasupra mesei pentru ca camera de pe brat sa vada caroiajul
+        angles = self.config.values.get("arm", {}).get("look_servos", [90, 130, 0, 0, 90, 30])
+        self.device.Arm_serial_servo_write6(*angles, 1000)
+        sleep(1.2)
+
     def move_to(self, pose: Pose) -> None:
+        move_time_ms = int(self.config.arm_value("move_time_ms", 1000))
         result = self.kinematics.setPitchRangeMoving(
-            (pose.x, pose.y, pose.z), -90, -90, 0, 1000
+            (pose.x, pose.y, pose.z), -90, -90, 0, move_time_ms
         )
         if result is False or result is None:
             raise RuntimeError(f"DOFBOT rejected unreachable pose: {pose}")
+        # OBLIGATORIU: asteapta ca bratul sa termine miscarea fizica!
+        sleep(move_time_ms / 1000.0 + 0.15)
 
     def gripper(self, opening: float) -> None:
-        self.device.Arm_serial_servo_write(6, int(opening), 300)
-
+        self.device.Arm_serial_servo_write(6, int(opening), 400)
+        sleep(0.45)
 
 def cell_pose(cell: GridCell, corners: list[tuple[float, float]], z: float) -> Pose:
     """Approximate XY mapping from grid cell to the calibrated board plane."""
@@ -74,17 +77,15 @@ def execute_pick_place(
     destination: Pose,
     config: RobotConfig,
 ) -> None:
-    safe = config.arm_value("safe_height", 120)
-    pick = config.arm_value("pick_height", source.z)
-    place = config.arm_value("place_height", destination.z)
-    arm.gripper(config.arm_value("grip_open", 30))
+    safe = config.arm_value("safe_height", 140)
+    arm.gripper(config.arm_value("grip_open", 40))
     arm.move_to(Pose(source.x, source.y, safe))
-    arm.move_to(Pose(source.x, source.y, pick))
-    arm.gripper(config.arm_value("grip_closed", 5))
+    arm.move_to(Pose(source.x, source.y, source.z))
+    arm.gripper(config.arm_value("grip_closed", 138))
     sleep(config.arm_value("settle_seconds", 0.35))
     arm.move_to(Pose(source.x, source.y, safe))
     arm.move_to(Pose(destination.x, destination.y, safe))
-    arm.move_to(Pose(destination.x, destination.y, place))
-    arm.gripper(config.arm_value("grip_open", 30))
+    arm.move_to(Pose(destination.x, destination.y, destination.z))
+    arm.gripper(config.arm_value("grip_open", 40))
     sleep(config.arm_value("settle_seconds", 0.35))
     arm.move_to(Pose(destination.x, destination.y, safe))

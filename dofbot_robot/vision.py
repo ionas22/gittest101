@@ -67,4 +67,5 @@ class CubeDetector:
     @staticmethod
     def orientation_marker_angle(contour: np.ndarray) -> float:
         rect = cv2.minAreaRect(contour)
+        angle = float(rect[2])
         return degrees(atan2(rect[1][1], rect[1][0]))
